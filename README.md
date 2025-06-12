@@ -236,14 +236,6 @@ done
 
 This project is designed for educational and benchmarking purposes. Modify and distribute as needed for your testing requirements.
 
-## Contributing
-
-To contribute improvements or additional test patterns:
-1. Maintain C18 standard compliance
-2. Preserve high-precision timing methodology
-3. Add appropriate error handling for new features
-4. Update documentation for new test types
-
 ## See Also
 
 - [Intel Memory Latency Checker](https://www.intel.com/content/www/us/en/developer/articles/tool/intelr-memory-latency-checker.html)
