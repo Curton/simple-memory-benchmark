@@ -10,7 +10,7 @@
 #define DEFAULT_SIZE_MB 64
 #define ITERATIONS 3
 #define RANDOM_ACCESSES 1000000  // Number of random accesses per iteration
-#define LATENCY_ACCESSES 100000  // Number of accesses for latency testing
+#define LATENCY_ACCESSES 1000000  // Reduced for pointer chasing - each access is serialized
 #define MB_TO_BYTES(mb) ((size_t)(mb) * 1024 * 1024)
 #define KB_TO_BYTES(kb) ((size_t)(kb) * 1024)
 #define MAX_CACHE_LEVELS 4
@@ -129,7 +129,7 @@ void display_cache_hierarchy() {
     }
     
     printf("%-5s %-12s %-10s %-12s %-15s\n", "Level", "Type", "Size", "Line Size", "Associativity");
-    printf("-------------------------------------------------------------\n");
+    printf("--------------------------------------------------------------------------------\n");
     
     for (int i = 0; i < num_cache_levels; i++) {
         cache_info_t* cache = &cache_levels[i];
@@ -198,7 +198,11 @@ void init_random() {
 // Generate random indices for memory access
 void generate_random_indices(size_t* indices, size_t count, size_t max_index) {
     for (size_t i = 0; i < count; i++) {
-        indices[i] = (size_t)rand() % max_index;
+        // Use high-order bits of rand() to generate indices. The low-order bits
+        // from rand() can be non-random, and using `%` with a power-of-two
+        // `max_index` isolates these non-random bits. This scaling method
+        // provides a more uniform distribution.
+        indices[i] = (size_t)((unsigned long long)rand() * max_index / (RAND_MAX + 1ULL));
     }
 }
 
@@ -313,36 +317,88 @@ double test_memory_copy(void* src, void* dst, size_t size, int iterations) {
     return end_time - start_time;
 }
 
-// Memory access latency test
+// True memory latency test using proper pointer chasing
 double test_memory_latency(void* buffer, size_t size, size_t num_accesses) {
-    size_t elements = size / sizeof(long long);
-    long long* data = (long long*)buffer;
+    // Use cache line sized elements to avoid false sharing
+    size_t cache_line_size = 64;  // bytes
+    size_t elements = size / cache_line_size;
+    char* data = (char*)buffer;
     
-    // Pre-generate random indices to avoid including RNG overhead in timing
-    size_t* indices = malloc(num_accesses * sizeof(size_t));
+    if (elements < 2) {
+        return -1.0;  // Buffer too small
+    }
+    
+    // Create a circular linked list with random permutation
+    // Each cache line contains a pointer to the next cache line
+    size_t* indices = malloc(elements * sizeof(size_t));
     if (!indices) {
-        fprintf(stderr, "Failed to allocate indices array for latency test\n");
+        fprintf(stderr, "Failed to allocate indices for latency test\n");
         return -1.0;
     }
     
-    generate_random_indices(indices, num_accesses, elements);
-    
-    // Warmup - touch all memory locations to ensure they're in memory
-    volatile long long warmup_sum = 0;
+    // Initialize with sequential indices
     for (size_t i = 0; i < elements; i++) {
-        warmup_sum += data[i];
+        indices[i] = i;
     }
     
-    double start_time = get_time();
-    volatile long long sum = 0;  // volatile to prevent optimization
+    // Fisher-Yates shuffle for true randomization
+    for (size_t i = elements - 1; i > 0; i--) {
+        size_t j = (size_t)((unsigned long long)rand() * (i + 1) / (RAND_MAX + 1ULL));
+        size_t temp = indices[i];
+        indices[i] = indices[j];
+        indices[j] = temp;
+    }
     
-    // Perform random accesses
+    // Create circular pointer chain: each element points to next in random order
+    for (size_t i = 0; i < elements; i++) {
+        size_t next_idx = indices[(i + 1) % elements];
+        // Store pointer at beginning of cache line
+        *((size_t*)(data + i * cache_line_size)) = next_idx * cache_line_size;
+    }
+    
+    free(indices);
+    
+    // Force all memory to be allocated by writing to every cache line
+    for (size_t i = 0; i < elements; i++) {
+        // Write to end of cache line to ensure full line is allocated
+        *(data + i * cache_line_size + cache_line_size - 1) = (char)(i & 0xFF);
+    }
+    
+    // Memory fence to ensure writes complete
+    __sync_synchronize();
+    
+    // Warmup: traverse the chain several times
+    char* ptr = data;  // Start at first cache line
+    for (size_t i = 0; i < elements * 3; i++) {
+        ptr = data + *((size_t*)ptr);
+    }
+    
+    // Another memory fence
+    __sync_synchronize();
+    
+    // Measure latency: time how long it takes to traverse the chain
+    double start_time = get_time();
+    
+    // Pointer chasing with memory dependencies
+    // Use volatile to prevent optimization
+    volatile char* volatile_ptr = data;
     for (size_t i = 0; i < num_accesses; i++) {
-        sum += data[indices[i]];
+        volatile_ptr = data + *((volatile size_t*)volatile_ptr);
     }
     
     double end_time = get_time();
-    free(indices);
+    
+    // Use volatile_ptr to prevent dead code elimination
+    if ((uintptr_t)volatile_ptr == 0) {
+        printf("Unexpected ptr value\n");
+    }
+    
+    // Debug: print timing info for troubleshooting
+    double total_time = end_time - start_time;
+    if (total_time < 1e-6) {  // Less than 1 microsecond suggests timing issues
+        fprintf(stderr, "Warning: Very short test time (%.9f s) for %zu accesses in %zu byte buffer\n", 
+                total_time, num_accesses, size);
+    }
     
     return end_time - start_time;
 }
@@ -367,8 +423,13 @@ void run_latency_test(size_t buffer_size, const char* size_name) {
         return;
     }
     
-    // Initialize buffer with data
-    memset(buffer, 0xCC, buffer_size);
+    // Initialize buffer with data - force actual memory allocation
+    // Use volatile writes to ensure memory is actually allocated and not optimized away
+    volatile long long* init_data = (volatile long long*)buffer;
+    size_t elements = buffer_size / sizeof(long long);
+    for (size_t i = 0; i < elements; i++) {
+        init_data[i] = (long long)(i ^ 0xCCCCCCCCCCCCCCCC);  // Unique pattern per element
+    }
     
     // Run latency test
     double latency_time = test_memory_latency(buffer, buffer_size, LATENCY_ACCESSES);
@@ -552,7 +613,7 @@ int main(int argc, char* argv[]) {
     // Perform tests
     printf("\nRunning bandwidth tests...\n");
     printf("%-20s  %-50s\n", "Test", "Bandwidth");
-    printf("------------------------------------------------------------------------\n");
+    printf("--------------------------------------------------------------------------------\n");
     
     // Sequential tests
     double read_time = test_sequential_read(buffer1, buffer_size, ITERATIONS);
@@ -579,7 +640,7 @@ int main(int argc, char* argv[]) {
     // Memory access latency tests with dynamic sizes based on cache hierarchy
     printf("\n");
     printf("Running memory access latency tests...\n");
-    printf("%-12s %-8s  %-50s %-12s\n", "Buffer Size", "Unit", "Average Latency", "Cache Level");
+    printf("%-12s %-8s  %-40s %-12s\n", "Buffer Size", "Unit", "Average Latency", "Cache Level");
     printf("--------------------------------------------------------------------------------\n");
     
     // Generate dynamic test sizes based on detected cache hierarchy

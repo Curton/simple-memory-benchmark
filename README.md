@@ -77,7 +77,7 @@ CPU cores available: 1
 CPU Cache Hierarchy:
 ===================
 Level Type         Size       Line Size    Associativity  
--------------------------------------------------------------
+--------------------------------------------------------------------------------
 L1    Data         32 KB      64           8              
 L1    Instruction  32 KB      64           8              
 L2    Unified      512 KB     64           8              
@@ -87,27 +87,27 @@ Initializing buffers...
 
 Running bandwidth tests...
 Test                  Bandwidth                                         
-------------------------------------------------------------------------
-Sequential Read     :   13.356 GB/s ( 13676.1 MB/s) - Time: 0.014 seconds
-Sequential Write    :   17.809 GB/s ( 18236.7 MB/s) - Time: 0.011 seconds
-Random Read         :    1.071 GB/s (  1096.4 MB/s) - 143.7 MIOPS - Time: 0.021 seconds
-Random Write        :    1.315 GB/s (  1346.7 MB/s) - 176.5 MIOPS - Time: 0.017 seconds
-Memory Copy         :   27.603 GB/s ( 28265.5 MB/s) - Time: 0.014 seconds
+--------------------------------------------------------------------------------
+Sequential Read     :   11.669 GB/s ( 11949.5 MB/s) - Time: 0.016 seconds
+Sequential Write    :   18.184 GB/s ( 18620.3 MB/s) - Time: 0.010 seconds
+Random Read         :    1.121 GB/s (  1147.8 MB/s) - 150.4 MIOPS - Time: 0.020 seconds
+Random Write        :    1.592 GB/s (  1630.4 MB/s) - 213.7 MIOPS - Time: 0.014 seconds
+Memory Copy         :   31.291 GB/s ( 32042.2 MB/s) - Time: 0.012 seconds
 
 Running memory access latency tests...
-Buffer Size  Unit      Average Latency                                    Cache Level 
+Buffer Size  Unit      Average Latency                          Cache Level 
 --------------------------------------------------------------------------------
 Test sizes generated based on detected cache hierarchy:
-4KB          (    KB):      0.6 ns/access (  0.00 us/access) - L1 Cache     - 100000 accesses
-16KB(L1)     (    KB):      0.5 ns/access (  0.00 us/access) - L1 Cache     - 100000 accesses
-48KB(>L1)    (    KB):      0.6 ns/access (  0.00 us/access) - L2 Cache     - 100000 accesses
-256KB(L2)    (    KB):      0.6 ns/access (  0.00 us/access) - L2 Cache     - 100000 accesses
-768KB(>L2)   (    KB):      1.0 ns/access (  0.00 us/access) - L3 Cache     - 100000 accesses
-8MB(L3)      (    MB):      4.8 ns/access (  0.00 us/access) - L3 Cache     - 100000 accesses
-24MB(>L3)    (    MB):      5.0 ns/access (  0.00 us/access) - Main Memory  - 100000 accesses
-32MB(RAM)    (    MB):      5.7 ns/access (  0.01 us/access) - Main Memory  - 100000 accesses
-64MB(RAM)    (    MB):      7.5 ns/access (  0.01 us/access) - Main Memory  - 100000 accesses
-128MB(RAM)   (    MB):      9.8 ns/access (  0.01 us/access) - Main Memory  - 100000 accesses
+4KB          (    KB):      1.4 ns/access (  0.00 us/access) - L1 Cache     - 1000000 accesses
+16KB(L1)     (    KB):      1.3 ns/access (  0.00 us/access) - L1 Cache     - 1000000 accesses
+48KB(>L1)    (    KB):      1.3 ns/access (  0.00 us/access) - L2 Cache     - 1000000 accesses
+256KB(L2)    (    KB):      4.2 ns/access (  0.00 us/access) - L2 Cache     - 1000000 accesses
+768KB(>L2)   (    KB):     11.0 ns/access (  0.01 us/access) - L3 Cache     - 1000000 accesses
+8MB(L3)      (    MB):     16.1 ns/access (  0.02 us/access) - L3 Cache     - 1000000 accesses
+24MB(>L3)    (    MB):     85.6 ns/access (  0.09 us/access) - Main Memory  - 1000000 accesses
+32MB(RAM)    (    MB):    106.2 ns/access (  0.11 us/access) - Main Memory  - 1000000 accesses
+64MB(RAM)    (    MB):    133.4 ns/access (  0.13 us/access) - Main Memory  - 1000000 accesses
+128MB(RAM)   (    MB):    157.4 ns/access (  0.16 us/access) - Main Memory  - 1000000 accesses
 
 Notes:
 - Sequential Read/Write: Measures linear memory access patterns
@@ -115,7 +115,7 @@ Notes:
 - Memory Copy: Measures combined read+write bandwidth (memcpy)
 - MIOPS: Million I/O Operations Per Second
 - Random tests use 1000000 accesses per iteration
-- Latency tests use 100000 random accesses per test
+- Latency tests use 1000000 random accesses per test
 - Latency tests measure average time per memory access
 - Cache Level indicates the likely memory hierarchy level being accessed
 - Cache hierarchy is detected from /sys/devices/system/cpu/ when available
