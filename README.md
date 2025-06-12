@@ -7,7 +7,7 @@ A high-performance C18-based memory testing tool that measures system memory ban
 - **Sequential Memory Tests**: Linear read/write performance measurement
 - **Random Memory Tests**: Random access pattern performance with configurable access counts
 - **Memory Copy Performance**: `memcpy()` bandwidth testing (combined read+write)
-- **Latency Analysis**: Access latency measurement across different buffer sizes (4KB to 16MB)
+- **Latency Analysis**: Access latency measurement across different buffer sizes
 - **Cache Hierarchy Analysis**: Multi-level cache performance characterization
 - **MIOPS Metrics**: Million I/O Operations Per Second calculation for random access tests
 - **Configurable Buffer Sizes**: Support for custom memory buffer sizes
