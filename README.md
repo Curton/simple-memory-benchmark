@@ -139,7 +139,6 @@ The latency tests reveal cache hierarchy characteristics:
 - **Iterations**: 3 (for bandwidth tests)
 - **Random Accesses**: 1,000,000 per iteration
 - **Latency Test Accesses**: 100,000 per buffer size
-- **Data Type**: 64-bit integers (`long long`) for consistent 8-byte access patterns
 
 ## Factors Affecting Results
 
