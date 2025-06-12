@@ -56,8 +56,7 @@ void read_cache_info() {
         // Read cache type
         if (fgets(buffer, sizeof(buffer), fp)) {
             buffer[strcspn(buffer, "\n")] = 0;  // Remove newline
-            strncpy(cache->type, buffer, sizeof(cache->type) - 1);
-            cache->type[sizeof(cache->type) - 1] = 0;
+            snprintf(cache->type, sizeof(cache->type), "%.15s", buffer);
         }
         fclose(fp);
         

@@ -9,10 +9,9 @@ A high-performance C18-based memory testing tool that measures system memory ban
 - **Memory Copy Performance**: `memcpy()` bandwidth testing (combined read+write)
 - **Latency Analysis**: Access latency measurement across different buffer sizes (4KB to 16MB)
 - **Cache Hierarchy Analysis**: Multi-level cache performance characterization
-- **High-Precision Timing**: Uses `clock_gettime(CLOCK_MONOTONIC)` for nanosecond accuracy
-- **Aligned Memory Allocation**: 64-byte aligned buffers for optimal cache line performance
-- **Configurable Buffer Sizes**: Support for custom memory buffer sizes
 - **MIOPS Metrics**: Million I/O Operations Per Second calculation for random access tests
+- **Configurable Buffer Sizes**: Support for custom memory buffer sizes
+
 
 ## Requirements
 
@@ -80,30 +79,30 @@ CPU Cache Hierarchy:
 Level Type         Size       Line Size    Associativity  
 -------------------------------------------------------------
 L1    Data         32 KB      64           8              
-L2    Instruction  32 KB      64           8              
-L3    Unified      512 KB     64           8              
-L4    Unified      16 MB      64           16             
+L1    Instruction  32 KB      64           8              
+L2    Unified      512 KB     64           8              
+L3    Unified      16 MB      64           16             
 
 Initializing buffers...
 
 Running bandwidth tests...
 Test                  Bandwidth                                         
 ------------------------------------------------------------------------
-Sequential Read     :    2.980 GB/s (  3051.3 MB/s) - Time: 0.063 seconds
-Sequential Write    :    9.179 GB/s (  9399.3 MB/s) - Time: 0.020 seconds
-Random Read         :    0.538 GB/s (   551.1 MB/s) - 72.2 MIOPS - Time: 0.042 seconds
-Random Write        :    0.707 GB/s (   724.1 MB/s) - 94.9 MIOPS - Time: 0.032 seconds
-Memory Copy         :   14.962 GB/s ( 15321.2 MB/s) - Time: 0.025 seconds
+Sequential Read     :    5.933 GB/s (  6074.9 MB/s) - Time: 0.032 seconds
+Sequential Write    :    9.025 GB/s (  9241.2 MB/s) - Time: 0.021 seconds
+Random Read         :    0.224 GB/s (   229.3 MB/s) - 30.1 MIOPS - Time: 0.100 seconds
+Random Write        :    0.739 GB/s (   756.5 MB/s) - 99.2 MIOPS - Time: 0.030 seconds
+Memory Copy         :   14.725 GB/s ( 15078.2 MB/s) - Time: 0.025 seconds
 
 Running memory access latency tests...
 Buffer Size  Unit      Average Latency                                    Cache Level 
 --------------------------------------------------------------------------------
-4KB          (    KB):      0.5 ns/access (  0.00 us/access) - L1 Cache     - 100000 accesses
-16KB         (    KB):      0.5 ns/access (  0.00 us/access) - L1 Cache     - 100000 accesses
-256KB        (    KB):      0.6 ns/access (  0.00 us/access) - L3 Cache     - 100000 accesses
-1MB          (    MB):      1.2 ns/access (  0.00 us/access) - L4 Cache     - 100000 accesses
-4MB          (    MB):      3.7 ns/access (  0.00 us/access) - L4 Cache     - 100000 accesses
-16MB         (    MB):      6.2 ns/access (  0.01 us/access) - L4 Cache     - 100000 accesses
+4KB          (    KB):      0.6 ns/access (  0.00 us/access) - L1 Cache     - 100000 accesses
+16KB         (    KB):      0.6 ns/access (  0.00 us/access) - L1 Cache     - 100000 accesses
+256KB        (    KB):      0.8 ns/access (  0.00 us/access) - L2 Cache     - 100000 accesses
+1MB          (    MB):      1.2 ns/access (  0.00 us/access) - L3 Cache     - 100000 accesses
+4MB          (    MB):      1.6 ns/access (  0.00 us/access) - L3 Cache     - 100000 accesses
+16MB         (    MB):     16.7 ns/access (  0.02 us/access) - L3 Cache     - 100000 accesses
 
 Notes:
 - Sequential Read/Write: Measures linear memory access patterns
