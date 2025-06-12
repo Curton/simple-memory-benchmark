@@ -68,33 +68,54 @@ make run-small
 ## Sample Output
 
 ```
-Memory Bandwidth Test (C18)
+Memory Bandwidth Test
 ===========================
 Buffer size: 64 MB (67108864 bytes)
 Iterations: 3
 Random accesses per iteration: 1000000
-CPU cores available: 8
+CPU cores available: 1
+
+CPU Cache Hierarchy:
+===================
+Level Type         Size       Line Size    Associativity  
+-------------------------------------------------------------
+L1    Data         32 KB      64           8              
+L2    Instruction  32 KB      64           8              
+L3    Unified      512 KB     64           8              
+L4    Unified      16 MB      64           16             
 
 Initializing buffers...
 
 Running bandwidth tests...
-Test                  Bandwidth                                          
+Test                  Bandwidth                                         
 ------------------------------------------------------------------------
-Sequential Read     :   12.456 GB/s ( 12755.2 MB/s) - Time: 0.158 seconds
-Sequential Write    :   11.234 GB/s ( 11503.6 MB/s) - Time: 0.175 seconds
-Random Read         :    2.891 GB/s (  2960.9 MB/s) - 378.2 MIOPS - Time: 0.681 seconds
-Random Write        :    3.142 GB/s (  3217.4 MB/s) - 410.8 MIOPS - Time: 0.626 seconds
-Memory Copy         :    8.765 GB/s (  8975.4 MB/s) - Time: 0.292 seconds
+Sequential Read     :    2.980 GB/s (  3051.3 MB/s) - Time: 0.063 seconds
+Sequential Write    :    9.179 GB/s (  9399.3 MB/s) - Time: 0.020 seconds
+Random Read         :    0.538 GB/s (   551.1 MB/s) - 72.2 MIOPS - Time: 0.042 seconds
+Random Write        :    0.707 GB/s (   724.1 MB/s) - 94.9 MIOPS - Time: 0.032 seconds
+Memory Copy         :   14.962 GB/s ( 15321.2 MB/s) - Time: 0.025 seconds
 
 Running memory access latency tests...
-Buffer Size  Unit      Average Latency                                    
-------------------------------------------------------------------------
-4KB          (KB   ):      2.1 ns/access (  0.00 us/access) - 100000 accesses
-16KB         (KB   ):      2.3 ns/access (  0.00 us/access) - 100000 accesses
-256KB        (KB   ):      3.8 ns/access (  0.00 us/access) - 100000 accesses
-1MB          (MB   ):     12.4 ns/access (  0.01 us/access) - 100000 accesses
-4MB          (MB   ):     28.7 ns/access (  0.03 us/access) - 100000 accesses
-16MB         (MB   ):     67.3 ns/access (  0.07 us/access) - 100000 accesses
+Buffer Size  Unit      Average Latency                                    Cache Level 
+--------------------------------------------------------------------------------
+4KB          (    KB):      0.5 ns/access (  0.00 us/access) - L1 Cache     - 100000 accesses
+16KB         (    KB):      0.5 ns/access (  0.00 us/access) - L1 Cache     - 100000 accesses
+256KB        (    KB):      0.6 ns/access (  0.00 us/access) - L3 Cache     - 100000 accesses
+1MB          (    MB):      1.2 ns/access (  0.00 us/access) - L4 Cache     - 100000 accesses
+4MB          (    MB):      3.7 ns/access (  0.00 us/access) - L4 Cache     - 100000 accesses
+16MB         (    MB):      6.2 ns/access (  0.01 us/access) - L4 Cache     - 100000 accesses
+
+Notes:
+- Sequential Read/Write: Measures linear memory access patterns
+- Random Read/Write: Measures random memory access patterns
+- Memory Copy: Measures combined read+write bandwidth (memcpy)
+- MIOPS: Million I/O Operations Per Second
+- Random tests use 1000000 accesses per iteration
+- Latency tests use 100000 random accesses per test
+- Latency tests measure average time per memory access
+- Cache Level indicates the likely memory hierarchy level being accessed
+- Cache hierarchy is detected from /sys/devices/system/cpu/ when available
+- Results may vary based on CPU cache, memory type, and system load
 ```
 
 ## Understanding the Results

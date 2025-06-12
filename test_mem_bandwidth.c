@@ -46,13 +46,12 @@ void read_cache_info() {
     num_cache_levels = 0;
     
     // Try to read cache info for CPU0 (assume uniform cache hierarchy)
-    for (int level = 0; level < MAX_CACHE_LEVELS; level++) {
-        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/type", level);
+    for (int index = 0; index < MAX_CACHE_LEVELS * 2; index++) {  // Allow more indices for L1I/L1D
+        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/type", index);
         fp = fopen(path, "r");
         if (!fp) break;
         
         cache_info_t* cache = &cache_levels[num_cache_levels];
-        cache->level = level;
         
         // Read cache type
         if (fgets(buffer, sizeof(buffer), fp)) {
@@ -63,7 +62,7 @@ void read_cache_info() {
         fclose(fp);
         
         // Read cache size
-        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/size", level);
+        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/size", index);
         fp = fopen(path, "r");
         if (fp) {
             if (fgets(buffer, sizeof(buffer), fp)) {
@@ -74,7 +73,7 @@ void read_cache_info() {
         }
         
         // Read cache line size
-        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/coherency_line_size", level);
+        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/coherency_line_size", index);
         fp = fopen(path, "r");
         if (fp) {
             if (fgets(buffer, sizeof(buffer), fp)) {
@@ -84,7 +83,7 @@ void read_cache_info() {
         }
         
         // Read associativity
-        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/ways_of_associativity", level);
+        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/ways_of_associativity", index);
         fp = fopen(path, "r");
         if (fp) {
             if (fgets(buffer, sizeof(buffer), fp)) {
@@ -94,14 +93,29 @@ void read_cache_info() {
         }
         
         // Count CPUs sharing this cache
-        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/shared_cpu_list", level);
+        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/shared_cpu_list", index);
         fp = fopen(path, "r");
         if (fp) {
             cache->shared_cpu_map_count = 1;  // Simplified - just mark as available
             fclose(fp);
         }
         
+        // Determine actual cache level based on type and size
+        if (strcmp(cache->type, "Data") == 0 || strcmp(cache->type, "Instruction") == 0) {
+            cache->level = 1;  // L1 cache
+        } else if (strcmp(cache->type, "Unified") == 0) {
+            // For unified caches, determine level by size
+            if (cache->size_kb <= 1024) {  // <= 1MB, likely L2
+                cache->level = 2;
+            } else {  // > 1MB, likely L3
+                cache->level = 3;
+            }
+        } else {
+            cache->level = index + 1;  // Fallback
+        }
+        
         num_cache_levels++;
+        if (num_cache_levels >= MAX_CACHE_LEVELS) break;
     }
 }
 
@@ -129,7 +143,7 @@ void display_cache_hierarchy() {
         }
         
         printf("L%-4d %-12s %-10s %-12d %-15d\n", 
-               cache->level + 1, cache->type, size_str, 
+               cache->level, cache->type, size_str, 
                cache->line_size, cache->associativity);
     }
     printf("\n");
@@ -145,7 +159,7 @@ const char* analyze_cache_level(size_t buffer_size, double latency_ns) {
                 size_t cache_size_bytes = cache->size_kb * 1024;
                 if (buffer_size <= cache_size_bytes) {
                     static char level_str[32];
-                    snprintf(level_str, sizeof(level_str), "L%d Cache", cache->level + 1);
+                    snprintf(level_str, sizeof(level_str), "L%d Cache", cache->level);
                     return level_str;
                 }
             }
@@ -189,7 +203,7 @@ void generate_random_indices(size_t* indices, size_t count, size_t max_index) {
     }
 }
 
-// Aligned memory allocation function (C99/C18 compatible)
+// Aligned memory allocation function
 void* aligned_malloc(size_t alignment, size_t size) {
     void* ptr;
     if (posix_memalign(&ptr, alignment, size) != 0) {
@@ -403,7 +417,7 @@ int main(int argc, char* argv[]) {
     
     size_t buffer_size = MB_TO_BYTES(size_mb);
     
-    printf("Memory Bandwidth Test (C18)\n");
+    printf("Memory Bandwidth Test\n");
     printf("===========================\n");
     printf("Buffer size: %zu MB (%zu bytes)\n", size_mb, buffer_size);
     printf("Iterations: %d\n", ITERATIONS);
