@@ -88,21 +88,26 @@ Initializing buffers...
 Running bandwidth tests...
 Test                  Bandwidth                                         
 ------------------------------------------------------------------------
-Sequential Read     :    5.933 GB/s (  6074.9 MB/s) - Time: 0.032 seconds
-Sequential Write    :    9.025 GB/s (  9241.2 MB/s) - Time: 0.021 seconds
-Random Read         :    0.224 GB/s (   229.3 MB/s) - 30.1 MIOPS - Time: 0.100 seconds
-Random Write        :    0.739 GB/s (   756.5 MB/s) - 99.2 MIOPS - Time: 0.030 seconds
-Memory Copy         :   14.725 GB/s ( 15078.2 MB/s) - Time: 0.025 seconds
+Sequential Read     :   13.356 GB/s ( 13676.1 MB/s) - Time: 0.014 seconds
+Sequential Write    :   17.809 GB/s ( 18236.7 MB/s) - Time: 0.011 seconds
+Random Read         :    1.071 GB/s (  1096.4 MB/s) - 143.7 MIOPS - Time: 0.021 seconds
+Random Write        :    1.315 GB/s (  1346.7 MB/s) - 176.5 MIOPS - Time: 0.017 seconds
+Memory Copy         :   27.603 GB/s ( 28265.5 MB/s) - Time: 0.014 seconds
 
 Running memory access latency tests...
 Buffer Size  Unit      Average Latency                                    Cache Level 
 --------------------------------------------------------------------------------
+Test sizes generated based on detected cache hierarchy:
 4KB          (    KB):      0.6 ns/access (  0.00 us/access) - L1 Cache     - 100000 accesses
-16KB         (    KB):      0.6 ns/access (  0.00 us/access) - L1 Cache     - 100000 accesses
-256KB        (    KB):      0.8 ns/access (  0.00 us/access) - L2 Cache     - 100000 accesses
-1MB          (    MB):      1.2 ns/access (  0.00 us/access) - L3 Cache     - 100000 accesses
-4MB          (    MB):      1.6 ns/access (  0.00 us/access) - L3 Cache     - 100000 accesses
-16MB         (    MB):     16.7 ns/access (  0.02 us/access) - L3 Cache     - 100000 accesses
+16KB(L1)     (    KB):      0.5 ns/access (  0.00 us/access) - L1 Cache     - 100000 accesses
+48KB(>L1)    (    KB):      0.6 ns/access (  0.00 us/access) - L2 Cache     - 100000 accesses
+256KB(L2)    (    KB):      0.6 ns/access (  0.00 us/access) - L2 Cache     - 100000 accesses
+768KB(>L2)   (    KB):      1.0 ns/access (  0.00 us/access) - L3 Cache     - 100000 accesses
+8MB(L3)      (    MB):      4.8 ns/access (  0.00 us/access) - L3 Cache     - 100000 accesses
+24MB(>L3)    (    MB):      5.0 ns/access (  0.00 us/access) - Main Memory  - 100000 accesses
+32MB(RAM)    (    MB):      5.7 ns/access (  0.01 us/access) - Main Memory  - 100000 accesses
+64MB(RAM)    (    MB):      7.5 ns/access (  0.01 us/access) - Main Memory  - 100000 accesses
+128MB(RAM)   (    MB):      9.8 ns/access (  0.01 us/access) - Main Memory  - 100000 accesses
 
 Notes:
 - Sequential Read/Write: Measures linear memory access patterns

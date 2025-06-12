@@ -379,6 +379,109 @@ void run_latency_test(size_t buffer_size, const char* size_name) {
     free(buffer);
 }
 
+// Generate dynamic test sizes based on cache hierarchy
+void generate_dynamic_test_sizes(size_t** test_sizes, char*** size_names, int* num_tests) {
+    const int max_tests = 20;
+    *test_sizes = malloc(max_tests * sizeof(size_t));
+    *size_names = malloc(max_tests * sizeof(char*));
+    *num_tests = 0;
+    
+    if (!*test_sizes || !*size_names) {
+        fprintf(stderr, "Failed to allocate memory for test size arrays\n");
+        return;
+    }
+    
+    // If we have cache information, generate tests around each cache level
+    if (num_cache_levels > 0) {
+        // Sort cache levels by size for proper ordering
+        for (int i = 0; i < num_cache_levels - 1; i++) {
+            for (int j = i + 1; j < num_cache_levels; j++) {
+                if (cache_levels[i].size_kb > cache_levels[j].size_kb) {
+                    cache_info_t temp = cache_levels[i];
+                    cache_levels[i] = cache_levels[j];
+                    cache_levels[j] = temp;
+                }
+            }
+        }
+        
+        // Add a small test to start with
+        (*test_sizes)[*num_tests] = KB_TO_BYTES(4);
+        (*size_names)[*num_tests] = strdup("4KB");
+        (*num_tests)++;
+        
+        for (int i = 0; i < num_cache_levels; i++) {
+            cache_info_t* cache = &cache_levels[i];
+            
+            // Skip instruction caches for memory tests
+            if (strcmp(cache->type, "Instruction") == 0) continue;
+            
+            size_t cache_size_bytes = cache->size_kb * 1024;
+            
+            // Test size that fits comfortably in this cache level (50% of cache)
+            size_t fit_size = cache_size_bytes / 2;
+            if (fit_size >= KB_TO_BYTES(8) && *num_tests < max_tests - 1) {
+                (*test_sizes)[*num_tests] = fit_size;
+                (*size_names)[*num_tests] = malloc(32);
+                if (fit_size >= MB_TO_BYTES(1)) {
+                    snprintf((*size_names)[*num_tests], 32, "%zuMB(L%d)", fit_size / (1024*1024), cache->level);
+                } else {
+                    snprintf((*size_names)[*num_tests], 32, "%zuKB(L%d)", fit_size / 1024, cache->level);
+                }
+                (*num_tests)++;
+            }
+            
+            // Test size that exceeds this cache level (150% of cache)
+            size_t exceed_size = cache_size_bytes + cache_size_bytes / 2;
+            if (*num_tests < max_tests - 1) {
+                (*test_sizes)[*num_tests] = exceed_size;
+                (*size_names)[*num_tests] = malloc(32);
+                if (exceed_size >= MB_TO_BYTES(1)) {
+                    snprintf((*size_names)[*num_tests], 32, "%zuMB(>L%d)", exceed_size / (1024*1024), cache->level);
+                } else {
+                    snprintf((*size_names)[*num_tests], 32, "%zuKB(>L%d)", exceed_size / 1024, cache->level);
+                }
+                (*num_tests)++;
+            }
+        }
+        
+        // Add some larger sizes to test main memory
+        size_t large_sizes[] = {MB_TO_BYTES(32), MB_TO_BYTES(64), MB_TO_BYTES(128)};
+        const char* large_names[] = {"32MB(RAM)", "64MB(RAM)", "128MB(RAM)"};
+        
+        for (int i = 0; i < 3 && *num_tests < max_tests; i++) {
+            (*test_sizes)[*num_tests] = large_sizes[i];
+            (*size_names)[*num_tests] = strdup(large_names[i]);
+            (*num_tests)++;
+        }
+    } else {
+        // Fallback to default sizes if no cache info available
+        size_t default_sizes[] = {
+            KB_TO_BYTES(4), KB_TO_BYTES(16), KB_TO_BYTES(256),
+            MB_TO_BYTES(1), MB_TO_BYTES(4), MB_TO_BYTES(16), MB_TO_BYTES(64)
+        };
+        const char* default_names[] = {
+            "4KB", "16KB", "256KB", "1MB", "4MB", "16MB", "64MB"
+        };
+        
+        for (int i = 0; i < 7 && *num_tests < max_tests; i++) {
+            (*test_sizes)[*num_tests] = default_sizes[i];
+            (*size_names)[*num_tests] = strdup(default_names[i]);
+            (*num_tests)++;
+        }
+    }
+}
+
+// Free memory allocated for dynamic test sizes
+void free_dynamic_test_sizes(size_t* test_sizes, char** size_names, int num_tests) {
+    if (test_sizes) free(test_sizes);
+    if (size_names) {
+        for (int i = 0; i < num_tests; i++) {
+            if (size_names[i]) free(size_names[i]);
+        }
+        free(size_names);
+    }
+}
+
 // Calculate and display bandwidth for sequential tests
 void display_bandwidth(const char* test_name, double time_taken, size_t data_size, int iterations) {
     double total_data_gb = (double)(data_size * iterations) / (1024.0 * 1024.0 * 1024.0);
@@ -473,18 +576,32 @@ int main(int argc, char* argv[]) {
     double copy_time = test_memory_copy(buffer1, buffer2, buffer_size, ITERATIONS);
     display_bandwidth("Memory Copy", copy_time, buffer_size * 2, ITERATIONS); // *2 for read+write
     
-    // Memory access latency tests
+    // Memory access latency tests with dynamic sizes based on cache hierarchy
     printf("\n");
     printf("Running memory access latency tests...\n");
     printf("%-12s %-8s  %-50s %-12s\n", "Buffer Size", "Unit", "Average Latency", "Cache Level");
     printf("--------------------------------------------------------------------------------\n");
     
-    run_latency_test(KB_TO_BYTES(4), "4KB");
-    run_latency_test(KB_TO_BYTES(16), "16KB");
-    run_latency_test(KB_TO_BYTES(256), "256KB");
-    run_latency_test(MB_TO_BYTES(1), "1MB");
-    run_latency_test(MB_TO_BYTES(4), "4MB");
-    run_latency_test(MB_TO_BYTES(16), "16MB");
+    // Generate dynamic test sizes based on detected cache hierarchy
+    size_t* test_sizes;
+    char** size_names;
+    int num_tests;
+    
+    generate_dynamic_test_sizes(&test_sizes, &size_names, &num_tests);
+    
+    if (num_cache_levels > 0) {
+        printf("Test sizes generated based on detected cache hierarchy:\n");
+    } else {
+        printf("Using default test sizes (cache hierarchy not available):\n");
+    }
+    
+    // Run all generated tests
+    for (int i = 0; i < num_tests; i++) {
+        run_latency_test(test_sizes[i], size_names[i]);
+    }
+    
+    // Clean up dynamically allocated memory
+    free_dynamic_test_sizes(test_sizes, size_names, num_tests);
     
     printf("\nNotes:\n");
     printf("- Sequential Read/Write: Measures linear memory access patterns\n");
