@@ -5,6 +5,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <dirent.h>
 
 #define DEFAULT_SIZE_MB 64
 #define ITERATIONS 3
@@ -12,6 +13,160 @@
 #define LATENCY_ACCESSES 100000  // Number of accesses for latency testing
 #define MB_TO_BYTES(mb) ((size_t)(mb) * 1024 * 1024)
 #define KB_TO_BYTES(kb) ((size_t)(kb) * 1024)
+#define MAX_CACHE_LEVELS 4
+
+// Cache information structure
+typedef struct {
+    int level;
+    char type[16];  // "Data", "Instruction", "Unified"
+    size_t size_kb;
+    int line_size;
+    int associativity;
+    int shared_cpu_map_count;
+} cache_info_t;
+
+// Global cache information
+static cache_info_t cache_levels[MAX_CACHE_LEVELS];
+static int num_cache_levels = 0;
+
+// Latency measurement results
+typedef struct {
+    const char* size_name;
+    size_t buffer_size;
+    double latency_ns;
+    const char* cache_level_hint;
+} latency_result_t;
+
+// Read cache information from /sys/devices/system/cpu/
+void read_cache_info() {
+    char path[256];
+    FILE* fp;
+    char buffer[256];
+    
+    num_cache_levels = 0;
+    
+    // Try to read cache info for CPU0 (assume uniform cache hierarchy)
+    for (int level = 0; level < MAX_CACHE_LEVELS; level++) {
+        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/type", level);
+        fp = fopen(path, "r");
+        if (!fp) break;
+        
+        cache_info_t* cache = &cache_levels[num_cache_levels];
+        cache->level = level;
+        
+        // Read cache type
+        if (fgets(buffer, sizeof(buffer), fp)) {
+            buffer[strcspn(buffer, "\n")] = 0;  // Remove newline
+            strncpy(cache->type, buffer, sizeof(cache->type) - 1);
+            cache->type[sizeof(cache->type) - 1] = 0;
+        }
+        fclose(fp);
+        
+        // Read cache size
+        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/size", level);
+        fp = fopen(path, "r");
+        if (fp) {
+            if (fgets(buffer, sizeof(buffer), fp)) {
+                cache->size_kb = atoi(buffer);
+                if (strstr(buffer, "M")) cache->size_kb *= 1024;  // Convert MB to KB
+            }
+            fclose(fp);
+        }
+        
+        // Read cache line size
+        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/coherency_line_size", level);
+        fp = fopen(path, "r");
+        if (fp) {
+            if (fgets(buffer, sizeof(buffer), fp)) {
+                cache->line_size = atoi(buffer);
+            }
+            fclose(fp);
+        }
+        
+        // Read associativity
+        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/ways_of_associativity", level);
+        fp = fopen(path, "r");
+        if (fp) {
+            if (fgets(buffer, sizeof(buffer), fp)) {
+                cache->associativity = atoi(buffer);
+            }
+            fclose(fp);
+        }
+        
+        // Count CPUs sharing this cache
+        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu0/cache/index%d/shared_cpu_list", level);
+        fp = fopen(path, "r");
+        if (fp) {
+            cache->shared_cpu_map_count = 1;  // Simplified - just mark as available
+            fclose(fp);
+        }
+        
+        num_cache_levels++;
+    }
+}
+
+// Display cache hierarchy information
+void display_cache_hierarchy() {
+    printf("\nCPU Cache Hierarchy:\n");
+    printf("===================\n");
+    
+    if (num_cache_levels == 0) {
+        printf("Cache information not available (requires /sys/devices/system/cpu/ access)\n");
+        return;
+    }
+    
+    printf("%-5s %-12s %-10s %-12s %-15s\n", "Level", "Type", "Size", "Line Size", "Associativity");
+    printf("-------------------------------------------------------------\n");
+    
+    for (int i = 0; i < num_cache_levels; i++) {
+        cache_info_t* cache = &cache_levels[i];
+        char size_str[32];
+        
+        if (cache->size_kb >= 1024) {
+            snprintf(size_str, sizeof(size_str), "%zu MB", cache->size_kb / 1024);
+        } else {
+            snprintf(size_str, sizeof(size_str), "%zu KB", cache->size_kb);
+        }
+        
+        printf("L%-4d %-12s %-10s %-12d %-15d\n", 
+               cache->level + 1, cache->type, size_str, 
+               cache->line_size, cache->associativity);
+    }
+    printf("\n");
+}
+
+// Analyze latency results to identify cache levels
+const char* analyze_cache_level(size_t buffer_size, double latency_ns) {
+    // If we have cache info, use it for more accurate analysis
+    if (num_cache_levels > 0) {
+        for (int i = 0; i < num_cache_levels; i++) {
+            cache_info_t* cache = &cache_levels[i];
+            if (strcmp(cache->type, "Data") == 0 || strcmp(cache->type, "Unified") == 0) {
+                size_t cache_size_bytes = cache->size_kb * 1024;
+                if (buffer_size <= cache_size_bytes) {
+                    static char level_str[32];
+                    snprintf(level_str, sizeof(level_str), "L%d Cache", cache->level + 1);
+                    return level_str;
+                }
+            }
+        }
+        return "Main Memory";
+    }
+    
+    // Fallback heuristic analysis based on common cache sizes and latency
+    if (buffer_size <= 32 * 1024) {  // <= 32KB
+        if (latency_ns < 5.0) return "L1 Cache";
+        else return "L2 Cache";
+    } else if (buffer_size <= 512 * 1024) {  // <= 512KB
+        if (latency_ns < 15.0) return "L2 Cache";
+        else return "L3 Cache";
+    } else if (buffer_size <= 8 * 1024 * 1024) {  // <= 8MB
+        if (latency_ns < 50.0) return "L3 Cache";
+        else return "Main Memory";
+    } else {
+        return "Main Memory";
+    }
+}
 
 // Utility function to get current time in seconds
 double get_time() {
@@ -179,15 +334,16 @@ double test_memory_latency(void* buffer, size_t size, size_t num_accesses) {
     return end_time - start_time;
 }
 
-// Display latency results
+// Display latency results with cache level analysis
 void display_latency(const char* test_name, double time_taken, size_t num_accesses, size_t buffer_size) {
     double avg_latency_ns = (time_taken * 1e9) / num_accesses;
     double avg_latency_us = avg_latency_ns / 1000.0;
+    const char* cache_level = analyze_cache_level(buffer_size, avg_latency_ns);
     
-    printf("%-12s (%6s): %8.1f ns/access (%6.2f us/access) - %zu accesses\n", 
+    printf("%-12s (%6s): %8.1f ns/access (%6.2f us/access) - %-12s - %zu accesses\n", 
            test_name, 
            buffer_size >= 1024*1024 ? "MB" : "KB",
-           avg_latency_ns, avg_latency_us, num_accesses);
+           avg_latency_ns, avg_latency_us, cache_level, num_accesses);
 }
 
 // Run latency test for a specific buffer size
@@ -253,7 +409,10 @@ int main(int argc, char* argv[]) {
     printf("Iterations: %d\n", ITERATIONS);
     printf("Random accesses per iteration: %d\n", RANDOM_ACCESSES);
     printf("CPU cores available: %ld\n", sysconf(_SC_NPROCESSORS_ONLN));
-    printf("\n");
+    
+    // Read and display cache hierarchy information
+    read_cache_info();
+    display_cache_hierarchy();
     
     // Initialize random number generator
     init_random();
@@ -304,8 +463,8 @@ int main(int argc, char* argv[]) {
     // Memory access latency tests
     printf("\n");
     printf("Running memory access latency tests...\n");
-    printf("%-12s %-8s  %-50s\n", "Buffer Size", "Unit", "Average Latency");
-    printf("------------------------------------------------------------------------\n");
+    printf("%-12s %-8s  %-50s %-12s\n", "Buffer Size", "Unit", "Average Latency", "Cache Level");
+    printf("--------------------------------------------------------------------------------\n");
     
     run_latency_test(KB_TO_BYTES(4), "4KB");
     run_latency_test(KB_TO_BYTES(16), "16KB");
@@ -322,6 +481,8 @@ int main(int argc, char* argv[]) {
     printf("- Random tests use %d accesses per iteration\n", RANDOM_ACCESSES);
     printf("- Latency tests use %d random accesses per test\n", LATENCY_ACCESSES);
     printf("- Latency tests measure average time per memory access\n");
+    printf("- Cache Level indicates the likely memory hierarchy level being accessed\n");
+    printf("- Cache hierarchy is detected from /sys/devices/system/cpu/ when available\n");
     printf("- Results may vary based on CPU cache, memory type, and system load\n");
     
     // Cleanup
